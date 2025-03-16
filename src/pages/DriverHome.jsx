@@ -405,7 +405,7 @@ const DriverHome = () => {
               {/* Progress Bar */}
               <div className="w-full h-1/6 flex flex-col justify-center items-center py-6">
                 <div className="w-full bg-gray-200 h-8 rounded-full overflow-hidden relative items-center flex">
-                  {[10, 20, 30, 40].map((num, index) => (
+                  {[2, 4, 6, 8].map((num, index) => (
                     <span
                       key={index}
                       className="absolute transform -translate-x-1/2 text-sm font-semibold text-white"
