@@ -77,7 +77,7 @@ const GoogleMapComponent = ({
               position={homeLocation}
               // Display the home location marker
               icon={{
-                url: "https://maps.google.com/mapfiles/kml/shapes/cabs.png", // Blue dot for the home location
+                url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png", // Blue dot for the home location
               }}
             />
           ))}
