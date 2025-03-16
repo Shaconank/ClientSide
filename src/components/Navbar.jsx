@@ -27,13 +27,12 @@ const Navbar = ({ setShowHomeSearch, resetHome, isHomeSet }) => {
             className="w-12 h-12"
           />
           <h1 className="text-xl font-bold text-black">
-            Namma Hackathon Submission (RIDER SIDE)
+            Namma Hackathon Submission (PASSENGER SIDE)
           </h1>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
-
           {/* My Account Icon */}
           <FaUserCircle
             className="text-3xl text-gray-700 cursor-pointer hover:text-black"

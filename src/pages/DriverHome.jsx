@@ -4,19 +4,32 @@ import GoogleMapComponent from "../components/GoogleMap";
 import SearchBar from "../components/SearchBar";
 import TripsList from "../components/TripsList";
 
-// Dummy function to simulate backend call
-const sendLocationToBackend = async (location, userId) => {
+// Helper function to truncate the address string until the second comma
+const truncateAddress = (address) => {
+  const parts = address.split(",");
+  return parts.length > 2 ? `${parts[0]}, ${parts[1]}` : address; // Only show up to the second comma
+};
+
+// Modified sendLocationToBackend function
+const sendLocationToBackend = async (currentLocation, userId, destination) => {
   try {
-    // Replace with your backend API call to send location data
-    const response = await fetch("/api/send-location", {
+    const response = await fetch("http://192.168.110.26:5000/request-ride", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        userId,
-        from: { lat: location.lat, lng: location.lng },
-        to: { lat: 12.9716, lng: 77.5946 }, // You can replace this with destination location
+        passenger_id: userId,
+        source: {
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+          location_name: currentLocation.location_name,
+        }, // Current location
+        destination: {
+          latitude: destination.lat,
+          longitude: destination.lng,
+          location_name: destination.location_name,
+        },
       }),
     });
 
@@ -25,38 +38,137 @@ const sendLocationToBackend = async (location, userId) => {
     }
 
     const data = await response.json();
-    return data; // Dummy data response
+    return data; // Assuming the backend returns { ride_id: 1, message: 'Ride requested' }
   } catch (error) {
     console.error("Error sending location:", error);
-    return { price: 50 }; // Dummy response
+    return { message: "Error requesting ride" }; // Dummy response
+  }
+};
+
+// New function to promote the ride to "pending"
+const promoteRideToPending = async (rideId) => {
+  try {
+    const response = await fetch(
+      `http://192.168.110.26:5000/promote-ride/${rideId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to promote ride");
+    }
+
+    const data = await response.json();
+    return data; // Assuming backend returns success message
+  } catch (error) {
+    console.error("Error promoting ride:", error);
+    return { message: "Error promoting ride" }; // Dummy response
+  }
+};
+
+// Function to check ride status
+const checkRideStatus = async (rideId) => {
+  try {
+    const response = await fetch(
+      `http://192.168.110.26:5000/ride-status/${rideId}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch ride status");
+    }
+
+    const data = await response.json();
+    return data.status;
+  } catch (error) {
+    console.error("Error checking ride status:", error);
+    return null; // If there is an error, return null
   }
 };
 
 const DriverHome = () => {
-  const [markerPosition, setMarkerPosition] = useState({ lat: 0, lng: 0 });
+  const [markerPosition, setMarkerPosition] = useState({
+    lat: 0,
+    lng: 0,
+  });
   const [homeLocation, setHomeLocation] = useState(null);
   const [passengerLocation, setPassengerLocation] = useState(null);
   const [route, setRoute] = useState(null);
   const [showHomeSearch, setShowHomeSearch] = useState(true);
   const [isHomeSet, setIsHomeSet] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState("Fetching location...");
+  const [currentLocation, setCurrentLocation] = useState({
+    lat: 0,
+    lng: 0,
+    location_name: "Fetching location...",
+  });
+  const [destination, setDestination] = useState(""); // State to hold the destination
   const [price, setPrice] = useState(null);
-  const [isPriceFetched, setIsPriceFetched] = useState(false); // New state for showing the "CONFIRM" button
-  const [showPassengerDetails, setShowPassengerDetails] = useState(false); // New state to show passenger details
+  const [isPriceFetched, setIsPriceFetched] = useState(false);
+  const [showPassengerDetails, setShowPassengerDetails] = useState(false);
+  const [progressWidth, setProgressWidth] = useState(24);
+  const [rideId, setRideId] = useState(null); // Track the ride id
+  const [driverInfo, setDriverInfo] = useState(null);
+  const [passengerInfo, setPassengerInfo] = useState(null);
 
-  const [progressWidth, setProgressWidth] = useState(24); // Starting progress for the progress bar
+  const passenger_id = 2;
 
   // Fetch current location from backend when component mounts
   useEffect(() => {
     const getCurrentLocation = async () => {
-      // Replace this with a real API call to get the current location
-      const location = { lat: 12.9716, lng: 77.5946 }; // Dummy location for now
-      setCurrentLocation(`Latitude: ${location.lat}, Longitude: ${location.lng}`);
-      setMarkerPosition(location); // Set the marker to the fetched location
+      try {
+        const response = await fetch(
+          `http://192.168.110.26:5000/get-passenger/${passenger_id}`
+        );
+        const data = await response.json();
+
+        if (data && data.current_location) {
+          const { latitude, longitude, location_name } = data.current_location;
+          setCurrentLocation({
+            lat: latitude,
+            lng: longitude,
+            location_name: location_name,
+          });
+          setMarkerPosition({ lat: latitude, lng: longitude });
+        }
+      } catch (error) {
+        console.error("Error fetching location:", error);
+        setCurrentLocation({
+          lat: 0,
+          lng: 0,
+          location_name: "Failed to fetch location.",
+        });
+      }
     };
 
     getCurrentLocation();
   }, []);
+
+  // Fetch driver and passenger info when the ride is accepted
+  const fetchDriverAndPassengerInfo = async (rideId) => {
+    try {
+      const rideResponse = await fetch(
+        `http://192.168.110.26:5000/ride/${rideId}`
+      );
+      const rideData = await rideResponse.json();
+
+      const driverResponse = await fetch(
+        `http://192.168.110.26:5000/get-driver/${rideData.driver_id}`
+      );
+      const driverData = await driverResponse.json();
+      setDriverInfo(driverData);
+
+      const passengerResponse = await fetch(
+        `http://192.168.110.26:5000/get-passenger/${rideData.passenger_id}`
+      );
+      const passengerData = await passengerResponse.json();
+      setPassengerInfo(passengerData);
+    } catch (error) {
+      console.error("Error fetching driver or passenger info:", error);
+    }
+  };
 
   const handleSetHomeLocation = (location) => {
     setHomeLocation(location);
@@ -69,27 +181,51 @@ const DriverHome = () => {
   };
 
   const handleOkayClick = async () => {
-    const userId = "dummyUserId"; // Replace this with actual userId from your authentication system
-    const location = markerPosition;
+    // Check if the destination is not empty before making the API call
+    if (!homeLocation.location_name) {
+      alert("Please enter a destination.");
+      return;
+    }
 
-    // Call the dummy backend function to send the location and fetch price
-    const response = await sendLocationToBackend(location, userId);
-    setPrice(response.price); // Assuming the backend returns { price: 50 }
-    setIsPriceFetched(true); // Set state to hide OKAY and show CONFIRM button
+    const response = await sendLocationToBackend(
+      currentLocation,
+      passenger_id,
+      homeLocation
+    );
+
+    if (response.message === "Ride requested") {
+      setRideId(response.ride_id); // Set the ride ID
+      setIsPriceFetched(true); // Set state to show price after ride request
+      setPrice(response.price); // Dummy price response, replace with actual API response
+    }
   };
 
-  const handleConfirmClick = () => {
-    // Show passenger details and hide the right side with search bars and price
-    setShowPassengerDetails(true);
-    setShowHomeSearch(false); // Hide the search bar section and price
+  const handleConfirmClick = async () => {
+    if (rideId) {
+      const response = await promoteRideToPending(rideId);
+      if (response.message === "Ride status updated to 'pending'") {
+        // Start checking the ride status
+        const checkStatusInterval = setInterval(async () => {
+          const status = await checkRideStatus(rideId);
+          if (status === "accepted") {
+            await fetchDriverAndPassengerInfo(rideId);
+            setShowPassengerDetails(true); // Show passenger details once the ride is accepted
+            clearInterval(checkStatusInterval); // Stop the interval once ride is accepted
+          }
+        }, 2000); // Check every 2 seconds
+        setShowHomeSearch(false);
+      } else {
+        alert("Failed to promote the ride. Please try again.");
+      }
+    }
   };
-
 
   const handleCancelRide = () => {
-    const isConfirmed = window.confirm("Are you sure you want to cancel the ride?");
+    const isConfirmed = window.confirm(
+      "Are you sure you want to cancel the ride?"
+    );
     if (isConfirmed) {
       const decreaseProgress = (currentWidth) => {
-
         const nearestMultipleOf10 = Math.floor(currentWidth / 10) * 10;
 
         if (currentWidth > nearestMultipleOf10) {
@@ -101,7 +237,6 @@ const DriverHome = () => {
             decreaseProgress(currentWidth - 1);
           }, 100);
         } else {
-
           setTimeout(() => {
             setShowPassengerDetails(false);
             setShowHomeSearch(true);
@@ -139,18 +274,22 @@ const DriverHome = () => {
             <>
               {/* Current Location Placeholder */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 ml-10">Current Location</label>
+                <label className="block text-sm font-medium text-gray-700 ml-10">
+                  Current Location
+                </label>
                 <input
                   type="text"
                   className="w-3/4 p-3 rounded-lg border shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ease-in-out duration-200 text-lg font-medium ml-10"
-                  placeholder={currentLocation}
+                  placeholder={currentLocation.location_name}
                   disabled
                 />
               </div>
 
               {/* Destination Search Bar with Label */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 ml-10">Destination</label>
+                <label className="block text-sm font-medium text-gray-700 ml-10">
+                  Destination
+                </label>
                 <SearchBar
                   setHomeLocation={handleSetHomeLocation}
                   setShowHomeSearch={setShowHomeSearch}
@@ -199,7 +338,10 @@ const DriverHome = () => {
                 <div className="w-full h-1/3 flex border-b border-gray-200">
                   <div className="w-3/10 h-full flex justify-center items-center p-4">
                     <img
-                      src="https://static.vecteezy.com/system/resources/thumbnails/000/439/863/small/Basic_Ui__28186_29.jpg"
+                      src={
+                        driverInfo?.profile_picture ||
+                        "https://static.vecteezy.com/system/resources/thumbnails/000/439/863/small/Basic_Ui__28186_29.jpg"
+                      }
                       alt="Profile"
                       className="w-38 h-38 rounded-full object-cover shadow-md"
                     />
@@ -207,31 +349,45 @@ const DriverHome = () => {
 
                   <div className="w-7/10 h-full flex flex-col p-4">
                     <div className="w-full h-2/3 flex items-center text-left justify-center">
-                      <span className="text-5xl font-bold text-gray-800 font-sans">Narayan Murthy</span>
+                      <span className="text-5xl font-bold text-gray-800 font-sans">
+                        {driverInfo?.name || "Passenger Name"}
+                      </span>
                     </div>
 
                     <div className="w-full h-1/3 flex justify-center items-center mt-10">
-                      <span className="text-l text-yellow-500 mr-50 font-semibold font-sans">Rating: 4.5/5</span>
-                      <span className="text-l text-gray-600 font-semibold font-sans">Streak: 5 days</span>
+                      <span className="text-l text-yellow-500 mr-50 font-semibold font-sans">
+                        Rating: {driverInfo?.rating || "4.1"}
+                      </span>
+                      <span className="text-l text-gray-600 font-semibold font-sans">
+                        Streak: {driverInfo?.streak_count || 0} days
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="w-full h-1/3 flex border-b border-gray-200">
                   <div className="w-1/2 h-full flex justify-center items-center p-4">
-                    <span className="text-4xl text-gray-700">Drop-off Location</span>
+                    <span className="text-2xl text-gray-700">
+                      DROP: {truncateAddress(homeLocation.location_name)}
+                    </span>
                   </div>
                   <div className="w-1/2 h-full flex justify-center items-center p-4">
-                    <span className="text-4xl text-gray-700">Pickup Location</span>
+                    <span className="text-2xl text-gray-700">
+                      PICKUP: {truncateAddress(currentLocation.location_name)}
+                    </span>
                   </div>
                 </div>
 
                 <div className="w-full h-1/3 flex">
                   <div className="w-1/2 h-full flex justify-center items-center p-4 border-r border-gray-200">
-                    <span className="font-semibold text-gray-800 text-2xl">Fare: ₹250</span>
+                    <span className="font-semibold text-gray-800 text-2xl">
+                      Fare: ₹{price}
+                    </span>
                   </div>
                   <div className="w-1/2 h-full flex justify-center items-center p-4">
-                    <span className="text-2xl font-semibold text-gray-800">ETA: 15 min</span>
+                    <span className="text-2xl font-semibold text-gray-800">
+                      ETA: 15 min
+                    </span>
                   </div>
                 </div>
               </div>
@@ -258,7 +414,10 @@ const DriverHome = () => {
                       {num}
                     </span>
                   ))}
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-blue-700" style={{ width: `${(progressWidth / 50) * 100}%` }}></div>
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-blue-700"
+                    style={{ width: `${(progressWidth / 50) * 100}%` }}
+                  ></div>
                   <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-2xl text-white font-bold">
                     🏆
                   </span>

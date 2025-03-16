@@ -9,7 +9,11 @@ import { useState, useEffect, useMemo } from "react";
 
 const API_KEY = "AIzaSyAnMQ1Kb2Bsm8FZk96U33_ATy8AFLFkdhU"; // Replace with your API key
 
-const GoogleMapComponent = ({ markerPosition, passengerLocation, homeLocation }) => {
+const GoogleMapComponent = ({
+  markerPosition,
+  passengerLocation,
+  homeLocation,
+}) => {
   const containerStyle = useMemo(
     () => ({
       width: "50%", // Map width is set to 50%
@@ -66,16 +70,17 @@ const GoogleMapComponent = ({ markerPosition, passengerLocation, homeLocation })
             scaledSize: { width: 35, height: 35 },
           }}
         />
-        {homeLocation && (
-          console.log(homeLocation),
-          <Marker
-            position={homeLocation}
-             // Display the home location marker
-            icon={{
-              url: "https://maps.google.com/mapfiles/kml/shapes/cabs.png", // Blue dot for the home location
-            }}
-          />
-        )}
+        {homeLocation &&
+          (console.log(homeLocation),
+          (
+            <Marker
+              position={homeLocation}
+              // Display the home location marker
+              icon={{
+                url: "https://maps.google.com/mapfiles/kml/shapes/cabs.png", // Blue dot for the home location
+              }}
+            />
+          ))}
         {passengerLocation && (
           <Marker
             position={passengerLocation}

@@ -4,7 +4,7 @@ const API_KEY = "AIzaSyAnMQ1Kb2Bsm8FZk96U33_ATy8AFLFkdhU";
 const autocompleteUrl = "https://places.googleapis.com/v1/places:autocomplete";
 const geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json";
 
-const SearchBar = ({ setHomeLocation, setShowHomeSearch }) => {
+const SearchBar = ({ setHomeLocation, setShowHomeSearch, setDestination }) => {
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -68,9 +68,15 @@ const SearchBar = ({ setHomeLocation, setShowHomeSearch }) => {
         setInputValue(place.description); // Set the search bar text to the selected place
 
         // Set home location and close the search bar
-        setHomeLocation(selectedLocation);
-        setSuggestions([]);  // Clear suggestions after selecting a place
-        setErrorMessage("");  // Clear any error message
+        setHomeLocation({
+          lat: selectedLocation.lat,
+          lng: selectedLocation.lng,
+          location_name: place.description,
+        });
+        console.log(selectedLocation);
+
+        setSuggestions([]); // Clear suggestions after selecting a place
+        setErrorMessage(""); // Clear any error message
       } else {
         setErrorMessage("No valid location found. Try again.");
       }
@@ -82,36 +88,35 @@ const SearchBar = ({ setHomeLocation, setShowHomeSearch }) => {
 
   return (
     <div className="flex w-3/4 ml-10 flex-col">
-  <input
-    type="text"
-    className="w-full border p-3 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ease-in-out duration-200 text-lg font-medium"
-    placeholder="Enter Destination"
-    value={inputValue}
-    onChange={(e) => {
-      setInputValue(e.target.value);
-      handleSearch(e.target.value); // Trigger search as user types
-      setErrorMessage(""); // Clear error when typing
-    }}
-  />
-  {errorMessage && (
-    <p className="text-red-500 text-sm mt-1">{errorMessage}</p>
-  )}
+      <input
+        type="text"
+        className="w-full border p-3 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ease-in-out duration-200 text-lg font-medium"
+        placeholder="Enter Destination"
+        value={inputValue}
+        onChange={(e) => {
+          setInputValue(e.target.value);
+          handleSearch(e.target.value); // Trigger search as user types
+          setErrorMessage(""); // Clear error when typing
+        }}
+      />
+      {errorMessage && (
+        <p className="text-red-500 text-sm mt-1">{errorMessage}</p>
+      )}
 
-  {suggestions.length > 0 && (
-    <ul className="mt-2 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-      {suggestions.map((place, index) => (
-        <li
-          key={index}
-          className="p-3 cursor-pointer hover:bg-indigo-100 transition-all ease-in-out duration-150"
-          onClick={() => handleSelectLocation(place)} 
-        >
-          {place.description}
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
-
+      {suggestions.length > 0 && (
+        <ul className="mt-2 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {suggestions.map((place, index) => (
+            <li
+              key={index}
+              className="p-3 cursor-pointer hover:bg-indigo-100 transition-all ease-in-out duration-150"
+              onClick={() => handleSelectLocation(place)}
+            >
+              {place.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 };
 
